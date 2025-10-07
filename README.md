@@ -259,7 +259,7 @@ VITE_APP_ENV=development
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/planmint.git
+git clone https://github.com/Arbab-ofc/PlanMint.git
 cd planmint
 
 # Install server dependencies
@@ -727,7 +727,7 @@ in the Software without restriction...
 
 ### 🚀 Ready to Ship Projects Without the Bloat?
 
-**[Get Started](https://your-deployment-url.com)** • **[Documentation](#)** • **[Report Bug](https://github.com/yourusername/planmint/issues)** • **[Request Feature](https://github.com/yourusername/planmint/issues)**
+**[Get Started](https://your-deployment-url.com)** • **[Documentation](#)** • **[Report Bug](https://github.com/Arbab-ofc/PlanMint/issues)** • **[Request Feature](https://github.com/Arbab-ofc/PlanMint/issues)**
 
 Made with ❤️ by the PlanMint Team
 
