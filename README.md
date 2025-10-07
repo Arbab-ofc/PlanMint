@@ -4,7 +4,7 @@
 
 <div align="center">
 
-🌐 [Live Demo](https://your-deployment-url.com) • 💻 [GitHub Repository](https://github.com/yourusername/planmint) • 📄 [License](LICENSE)
+🌐 [Live Demo](https://your-deployment-url.com) • 💻 [GitHub Repository](https://github.com/Arbab-ofc/PlanMint) • 📄 [License](LICENSE)
 
 **PlanMint is a clean, fast project platform that keeps small teams focused.** It pairs a crisp UI with opinionated guardrails: owners and admins control membership and project status; members stay focused on their assigned work.
 
