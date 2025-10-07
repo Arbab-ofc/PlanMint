@@ -455,6 +455,8 @@ export async function forgotPassword(req, res, next) {
     user.resetTokenExpiresAt = otpExpiresAt;
     await user.save();
 
+    console.log('Generated OTP for password reset:', otp);
+
     
     try {
       await sendTemplate('forgotPasswordOTP', emailStr, {

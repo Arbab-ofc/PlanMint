@@ -61,7 +61,7 @@ app.get('/', (req, res) => {
     status: 'success',
     message: 'Server is running!',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
+    environment: process.env.NODE_ENV || 'production',
     database: 'connected'
   });
 });
@@ -131,14 +131,14 @@ app.use((err, req, res, next) => {
     status: 'error',
     statusCode,
     message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    ...(process.env.NODE_ENV === 'production' && { stack: err.stack })
   });
 });
 
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📝 Environment: ${process.env.NODE_ENV || 'production'}`);
   console.log(`🔗 URL: http://localhost:${PORT}`);
 });
 

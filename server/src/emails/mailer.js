@@ -10,10 +10,16 @@ const {
   EMAIL_USER,
   EMAIL_PASSWORD,
   EMAIL_FROM,
+  NODE_ENV,
 } = process.env;
 
 const port = EMAIL_PORT ? Number(EMAIL_PORT) : 587;
 const secure = port === 465;
+
+const tls =
+  NODE_ENV === "production"
+    ? undefined
+    : { rejectUnauthorized: false };
 
 if (!EMAIL_HOST || !EMAIL_PORT || !EMAIL_USER || !EMAIL_PASSWORD) {
   console.warn(
@@ -29,9 +35,8 @@ const transporter = nodemailer.createTransport({
     user: EMAIL_USER,
     pass: EMAIL_PASSWORD,
   },
-  tls: {
-    rejectUnauthorized: false,
-  },
+  pool: true,
+  tls
 });
 
 transporter.verify().then(
