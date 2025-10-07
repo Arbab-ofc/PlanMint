@@ -1,0 +1,74 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+
+# --- Node / Package Artifacts ---
+node_modules/
+# (Keep lockfiles committed for reproducible installs)
+
+# --- Build Outputs ---
+dist/
+build/
+
+# --- Tool Caches ---
+.eslintcache
+.cache/
+.tmp/
+.vite/
+*.tsbuildinfo
+
+# --- Coverage ---
+coverage/
+
+# --- Logs ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+pnpm-debug.yaml
+
+# --- Environment Files (CRA/Vite/etc.) ---
+.env
+.env.*
+!.env.example
+
+# --- Framework / Preview Outputs (optional common ones) ---
+.out/
+.next/
+.storybook-out/
+
+# --- Cypress / E2E artifacts (if used) ---
+cypress/videos/
+cypress/screenshots/
+cypress/downloads/
+
+# --- OS / Editor junk ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+

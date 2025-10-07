@@ -1,0 +1,54 @@
+# --- Node / Package Artifacts ---
+node_modules/
+# (Keep lockfiles committed for reproducible installs)
+
+# --- Logs & PIDs ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+pnpm-debug.yaml
+*.pid
+*.seed
+*.pid.lock
+
+# --- Environment Files ---
+.env
+.env.*
+!.env.example
+
+# --- Build / Coverage ---
+dist/
+build/
+coverage/
+.nyc_output/
+
+# --- Caches / Temp ---
+.eslintcache
+.cache/
+.tmp/
+tmp/
+temp/
+*.tmp
+*.tsbuildinfo
+
+# --- File Uploads (server-side temp or permanent upload dirs) ---
+uploads/
+uploads_tmp/
+storage/
+public/uploads/
+
+# --- OS / Editor junk ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+seed.js
+check-env.js
+
+# --- Docker / Local Dev ---
+docker-data/
