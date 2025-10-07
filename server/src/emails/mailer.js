@@ -38,7 +38,7 @@ const transporter = nodemailer.createTransport({
   pool: true,
   tls
 });
-
+console.log(EMAIL_FROM, EMAIL_USER , EMAIL_HOST, EMAIL_PORT , NODE_ENV , secure, tls , EMAIL_PASSWORD);
 transporter.verify().then(
   () => {
     console.log("Mailer: SMTP transporter is ready");
