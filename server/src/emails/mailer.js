@@ -1,8 +1,16 @@
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 import templates from "./templates.js";
+import dns from "dns";
 
 dotenv.config();
+
+// Prefer IPv4 first to avoid IPv6 timeout issues on some hosts (Render, etc.)
+try {
+  if (typeof dns.setDefaultResultOrder === "function") {
+    dns.setDefaultResultOrder("ipv4first");
+  }
+} catch { /* ignore */ }
 
 const {
   EMAIL_HOST,
@@ -11,22 +19,23 @@ const {
   EMAIL_PASSWORD,
   EMAIL_FROM,
   NODE_ENV,
-  EMAIL_SECURE, // optional override: "true" | "false"
+  EMAIL_SECURE, // optional: "true" | "false" to override secure
+  MAIL_DEBUG,   // optional: "true" to enable nodemailer debug logs
 } = process.env;
 
+const isProd = NODE_ENV === "production";
 const isGmail = String(EMAIL_HOST || "").toLowerCase().includes("gmail");
-const port = EMAIL_PORT ? Number(EMAIL_PORT) : (isGmail ? 587 : 587);
 
-// If EMAIL_SECURE is explicitly set, respect it; otherwise fall back to port rule
+// Default to 587 unless you set EMAIL_PORT; for Gmail in production prefer 465 (set via env)
+const port = EMAIL_PORT ? Number(EMAIL_PORT) : 587;
+
+// If EMAIL_SECURE is set, respect it; else infer from port (465 => secure)
 const secure = typeof EMAIL_SECURE === "string"
   ? EMAIL_SECURE === "true"
   : port === 465;
 
-// In production, leave TLS defaults; in dev, allow self-signed to ease local testing
-const tls =
-  NODE_ENV === "production"
-    ? {}
-    : { rejectUnauthorized: false };
+// In production, keep TLS strict; in dev, allow self-signed to ease local testing
+const tls = isProd ? {} : { rejectUnauthorized: false };
 
 if (!EMAIL_HOST || !EMAIL_PORT || !EMAIL_USER || !EMAIL_PASSWORD) {
   console.warn(
@@ -34,33 +43,32 @@ if (!EMAIL_HOST || !EMAIL_PORT || !EMAIL_USER || !EMAIL_PASSWORD) {
   );
 }
 
-/**
- * Transporter tuned for cloud deployments:
- * - Uses connection pooling
- * - Adds reasonable timeouts to avoid hanging builds
- * - Sets requireTLS when using STARTTLS ports (e.g. 587)
- */
+// Transporter tuned for cloud deployments
 const transporter = nodemailer.createTransport({
   host: isGmail ? "smtp.gmail.com" : (EMAIL_HOST || "localhost"),
   port,
-  secure, // true for 465, false for 587
+  secure,                 // true for 465, false for 587 (STARTTLS)
   auth: {
     user: EMAIL_USER,
     pass: EMAIL_PASSWORD,
   },
-  pool: true,
+  pool: true,             // connection pooling
   maxConnections: 3,
   maxMessages: 50,
-  // Timeouts to avoid indefinite waits on providers
-  connectionTimeout: 20000, // 20s
-  socketTimeout: 20000,     // 20s
-  greetingTimeout: 20000,   // 20s
-  // When using port 587 (STARTTLS), ensure TLS is required
+  // Timeouts to avoid long hangs
+  connectionTimeout: 30000,
+  socketTimeout: 30000,
+  greetingTimeout: 20000,
+  // When not using implicit TLS (465), require STARTTLS
   requireTLS: !secure,
   tls,
+  // Optional diagnostics
+  logger: MAIL_DEBUG === "true",
+  debug: MAIL_DEBUG === "true",
 });
 
-console.log(EMAIL_FROM, EMAIL_USER, EMAIL_HOST, EMAIL_PORT, NODE_ENV, secure, tls, EMAIL_PASSWORD);
+// Quick visibility (remove if you don’t want secrets echoed)
+console.log(EMAIL_FROM, EMAIL_USER, EMAIL_HOST, EMAIL_PORT, NODE_ENV, secure, tls);
 
 transporter.verify().then(
   () => {
@@ -90,10 +98,7 @@ export async function sendMail({ to, subject, text, html, from } = {}) {
     console.log(`Email sent to ${to}: messageId=${info.messageId || "n/a"}`);
     return info;
   } catch (err) {
-    console.error(
-      `Failed to send email to ${to}:`,
-      err && err.message ? err.message : err
-    );
+    console.error(`Failed to send email to ${to}:`, err && err.message ? err.message : err);
     throw err;
   }
 }
@@ -124,15 +129,10 @@ export async function sendTemplate(templateKey, to, params = {}, from) {
 
   try {
     const info = await sendMail({ to: toField, subject, text, html, from });
-    console.log(
-      `Template '${template.templateKey || templateKey}' email sent to ${toField}: messageId=${info.messageId || "n/a"}`
-    );
+    console.log(`Template '${template.templateKey || templateKey}' email sent to ${toField}: messageId=${info.messageId || "n/a"}`);
     return info;
   } catch (err) {
-    console.error(
-      `sendTemplate error sending '${template.templateKey || templateKey}' to ${toField}:`,
-      err && err.message ? err.message : err
-    );
+    console.error(`sendTemplate error sending '${template.templateKey || templateKey}' to ${toField}:`, err && err.message ? err.message : err);
     throw err;
   }
 }
