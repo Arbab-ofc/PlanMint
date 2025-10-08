@@ -58,6 +58,7 @@ if (shouldVerify) {
       console.log(shouldVerify)
     },
     (err) => {
+      console.log(shouldVerify)
       console.warn("Mailer: SMTP transporter verification failed:", err && err.message);
     }
   );
