@@ -1,4 +1,4 @@
-// mailer.js (ready for deployment; keeps your public API the same)
+// mailer.js — Gmail service only (no host/port/secure), ready for deployment
 
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
@@ -7,78 +7,48 @@ import dns from "dns";
 
 dotenv.config();
 
-// Prefer IPv4 in cloud environments to avoid IPv6 egress issues
+// Prefer IPv4 to avoid IPv6 egress issues on some hosts
 if (typeof dns.setDefaultResultOrder === "function") {
   dns.setDefaultResultOrder("ipv4first");
 }
 
 const {
-  EMAIL_HOST,
-  EMAIL_PORT,
   EMAIL_USER,
   EMAIL_PASSWORD,
   EMAIL_FROM,
   NODE_ENV,
-  EMAIL_SECURE,            // NEW: allow explicit secure toggle via env
-  MAIL_VERIFY_ON_BOOT,     // NEW: optionally skip transporter.verify() in prod
+  MAIL_VERIFY_ON_BOOT, // optional: set to "false" to skip verify on boot
 } = process.env;
 
-// Port & secure resolution
-const port = EMAIL_PORT ? Number(EMAIL_PORT) : 587;
-
-// If EMAIL_SECURE is provided, use it; otherwise infer from port (465 => true)
-const secure =
-  typeof EMAIL_SECURE !== "undefined"
-    ? String(EMAIL_SECURE).toLowerCase() === "true"
-    : port === 465;
-
-// TLS:
-//  - For production, leave TLS object empty (default validation).
-//  - For non-prod, we keep your previous relaxed TLS to ease local testing.
-const tls =
-  NODE_ENV === "production"
-    ? {}
-    : { rejectUnauthorized: false };
-
-// Build transport options with helpful timeouts & STARTTLS requirement when secure=false
-const transportOptions = {
-  host: EMAIL_HOST || "localhost",
-  port,
-  secure, // true => implicit TLS (465), false => STARTTLS (587)
-  auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASSWORD,
-  },
-  pool: true,
-  // Robust timeouts (ms)
-  connectionTimeout: 20000, // connect phase
-  greetingTimeout: 20000,   // waiting for the greeting after connection
-  socketTimeout: 30000,     // overall inactivity on the socket
-  // On 587 we require STARTTLS; on 465 (secure=true) this is not used
-  ...(secure ? {} : { requireTLS: true }),
-  tls,
-};
-
-// Sanity warning if required env is missing
-if (!EMAIL_HOST || !EMAIL_PORT || !EMAIL_USER || !EMAIL_PASSWORD) {
+if (!EMAIL_USER || !EMAIL_PASSWORD) {
   console.warn(
-    "Mailer warning: EMAIL_HOST, EMAIL_PORT, EMAIL_USER or EMAIL_PASSWORD is not set. Emails may fail to send."
+    "Mailer warning: EMAIL_USER or EMAIL_PASSWORD is not set. Emails may fail to send."
   );
 }
 
-// Create transporter
-const transporter = nodemailer.createTransport(transportOptions);
+// Create transporter using Gmail service (no host/port/secure)
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: EMAIL_USER,       // e.g. yourgmail@gmail.com
+    pass: EMAIL_PASSWORD,   // 16-character App Password
+  },
+  pool: true,
+  maxConnections: 3,
+  maxMessages: 100,
+  connectionTimeout: 20000,
+  greetingTimeout: 20000,
+  socketTimeout: 30000,
+});
 
-// Optional verify (you can disable in prod with MAIL_VERIFY_ON_BOOT=false)
 const shouldVerify =
   (MAIL_VERIFY_ON_BOOT ?? "true").toLowerCase() === "true";
 
 console.log(
-  "[Mailer] host=%s port=%s secure=%s node_env=%s",
-  EMAIL_HOST,
-  port,
-  secure,
-  NODE_ENV
+  "[Mailer] service=gmail user=%s node_env=%s verifyOnBoot=%s",
+  EMAIL_USER,
+  NODE_ENV,
+  shouldVerify
 );
 
 if (shouldVerify) {
@@ -87,10 +57,7 @@ if (shouldVerify) {
       console.log("Mailer: SMTP transporter is ready");
     },
     (err) => {
-      console.warn(
-        "Mailer: SMTP transporter verification failed:",
-        err && err.message
-      );
+      console.warn("Mailer: SMTP transporter verification failed:", err && err.message);
     }
   );
 }
