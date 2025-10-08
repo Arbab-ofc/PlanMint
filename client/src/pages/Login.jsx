@@ -10,7 +10,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/; // added
 
 export default function Login() {
   
-  const { refresh, setUser } = useUser(); // header update on login
+  const { refresh, setUser } = useUser(); 
   const nav = useNavigate();
   const loc = useLocation();
   const redirectTo = loc.state?.from?.pathname || "/dashboard";
