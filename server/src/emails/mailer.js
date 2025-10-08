@@ -1,51 +1,42 @@
-// mailer.js — Gmail service only (no host/port/secure), ready for deployment
+// src/utils/mailer.js
+// Gmail-only mailer (no host/port/secure). Keeps templates flow as-is.
+// Exposes: sendMail, sendTemplate, transporter, and a convenience sendEmail().
 
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 import templates from "./templates.js";
-import dns from "dns";
 
 dotenv.config();
 
-// Prefer IPv4 to avoid IPv6 egress issues on some hosts
-if (typeof dns.setDefaultResultOrder === "function") {
-  dns.setDefaultResultOrder("ipv4first");
-}
-
 const {
   EMAIL_USER,
-  EMAIL_PASSWORD,
+  EMAIL_PASS,       // preferred (matches your reference)
+  EMAIL_PASSWORD,   // fallback (matches your earlier code)
   EMAIL_FROM,
-  NODE_ENV,
-  MAIL_VERIFY_ON_BOOT, // optional: set to "false" to skip verify on boot
 } = process.env;
 
-if (!EMAIL_USER || !EMAIL_PASSWORD) {
-  console.warn(
-    "Mailer warning: EMAIL_USER or EMAIL_PASSWORD is not set. Emails may fail to send."
-  );
-}
+const GMAIL_PASS = EMAIL_PASS || EMAIL_PASSWORD;
 
-// Create transporter using Gmail service (no host/port/secure)
+// Create a simple Gmail transporter (no host/port/secure)
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: EMAIL_USER,       // e.g. yourgmail@gmail.com
-    pass: EMAIL_PASSWORD,   // 16-character App Password
+    user: EMAIL_USER,
+    pass: GMAIL_PASS, // Gmail App Password
   },
-  pool: true,
-  maxConnections: 3,
-  maxMessages: 100,
-  connectionTimeout: 20000,
-  greetingTimeout: 20000,
-  socketTimeout: 30000,
 });
 
+// Optional: light verification (won’t crash app if it fails)
 
 
+/** Core sender (throws on error; same behavior as your previous code) */
 export async function sendMail({ to, subject, text, html, from } = {}) {
   if (!to) throw new Error("sendMail error: 'to' is required");
   if (!subject) throw new Error("sendMail error: 'subject' is required");
+
+  if (!EMAIL_USER || !GMAIL_PASS) {
+    throw new Error("sendMail error: EMAIL_USER or EMAIL_PASS/EMAIL_PASSWORD not set");
+  }
 
   const defaultFrom = from || EMAIL_FROM || EMAIL_USER;
 
@@ -59,17 +50,15 @@ export async function sendMail({ to, subject, text, html, from } = {}) {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`Email sent to ${to}: messageId=${info.messageId || "n/a"}`);
+    console.log(`Email sent to ${to}: messageId=${info?.messageId || "n/a"}`);
     return info;
   } catch (err) {
-    console.error(
-      `Failed to send email to ${to}:`,
-      err && err.message ? err.message : err
-    );
+    console.error(`Failed to send email to ${to}:`, err?.message || err);
     throw err;
   }
 }
 
+/** Template sender (keeps your `templates` integration & structure) */
 export async function sendTemplate(templateKey, to, params = {}, from) {
   if (!to) throw new Error("sendTemplate error: 'to' is required");
   if (!templateKey) throw new Error("sendTemplate error: 'templateKey' is required");
@@ -96,18 +85,32 @@ export async function sendTemplate(templateKey, to, params = {}, from) {
 
   try {
     const info = await sendMail({ to: toField, subject, text, html, from });
-    console.log(
-      `Template '${template.templateKey || templateKey}' email sent to ${toField}: messageId=${info.messageId || "n/a"}`
-    );
+    console.log(`Template '${template.templateKey || templateKey}' email sent to ${toField}: messageId=${info?.messageId || "n/a"}`);
     return info;
   } catch (err) {
-    console.error(
-      `sendTemplate error sending '${template.templateKey || templateKey}' to ${toField}:`,
-      err && err.message ? err.message : err
-    );
+    console.error(`sendTemplate error sending '${template.templateKey || templateKey}' to ${toField}:`, err?.message || err);
     throw err;
   }
 }
 
+/**
+ * Convenience helper that mimics your reference signature & boolean return:
+ * sendEmail({ email, subject, text, html }) -> boolean
+ * Internally uses sendMail to keep one code path.
+ */
+export async function sendEmail({ email, subject, text, html, from } = {}) {
+  try {
+    if (!email || !subject || (!text && !html)) {
+      console.error("sendEmail: missing required parameters");
+      return false;
+    }
+    await sendMail({ to: email, subject, text, html, from });
+    return true;
+  } catch (err) {
+    console.error("sendEmail failed:", err?.message || err);
+    return false;
+  }
+}
+
 export { transporter };
-export default sendMail;
+export default { sendMail, sendTemplate, sendEmail };
