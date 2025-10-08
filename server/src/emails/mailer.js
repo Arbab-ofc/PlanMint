@@ -11,14 +11,21 @@ const {
   EMAIL_PASSWORD,
   EMAIL_FROM,
   NODE_ENV,
+  EMAIL_SECURE, // optional override: "true" | "false"
 } = process.env;
 
-const port = EMAIL_PORT ? Number(EMAIL_PORT) : 587;
-const secure = port === 465;
+const isGmail = String(EMAIL_HOST || "").toLowerCase().includes("gmail");
+const port = EMAIL_PORT ? Number(EMAIL_PORT) : (isGmail ? 587 : 587);
 
+// If EMAIL_SECURE is explicitly set, respect it; otherwise fall back to port rule
+const secure = typeof EMAIL_SECURE === "string"
+  ? EMAIL_SECURE === "true"
+  : port === 465;
+
+// In production, leave TLS defaults; in dev, allow self-signed to ease local testing
 const tls =
   NODE_ENV === "production"
-    ? undefined
+    ? {}
     : { rejectUnauthorized: false };
 
 if (!EMAIL_HOST || !EMAIL_PORT || !EMAIL_USER || !EMAIL_PASSWORD) {
@@ -27,18 +34,34 @@ if (!EMAIL_HOST || !EMAIL_PORT || !EMAIL_USER || !EMAIL_PASSWORD) {
   );
 }
 
+/**
+ * Transporter tuned for cloud deployments:
+ * - Uses connection pooling
+ * - Adds reasonable timeouts to avoid hanging builds
+ * - Sets requireTLS when using STARTTLS ports (e.g. 587)
+ */
 const transporter = nodemailer.createTransport({
-  host: EMAIL_HOST || "localhost",
+  host: isGmail ? "smtp.gmail.com" : (EMAIL_HOST || "localhost"),
   port,
-  secure,
+  secure, // true for 465, false for 587
   auth: {
     user: EMAIL_USER,
     pass: EMAIL_PASSWORD,
   },
   pool: true,
-  tls
+  maxConnections: 3,
+  maxMessages: 50,
+  // Timeouts to avoid indefinite waits on providers
+  connectionTimeout: 20000, // 20s
+  socketTimeout: 20000,     // 20s
+  greetingTimeout: 20000,   // 20s
+  // When using port 587 (STARTTLS), ensure TLS is required
+  requireTLS: !secure,
+  tls,
 });
-console.log(EMAIL_FROM, EMAIL_USER , EMAIL_HOST, EMAIL_PORT , NODE_ENV , secure, tls , EMAIL_PASSWORD);
+
+console.log(EMAIL_FROM, EMAIL_USER, EMAIL_HOST, EMAIL_PORT, NODE_ENV, secure, tls, EMAIL_PASSWORD);
+
 transporter.verify().then(
   () => {
     console.log("Mailer: SMTP transporter is ready");
@@ -67,7 +90,10 @@ export async function sendMail({ to, subject, text, html, from } = {}) {
     console.log(`Email sent to ${to}: messageId=${info.messageId || "n/a"}`);
     return info;
   } catch (err) {
-    console.error(`Failed to send email to ${to}:`, err && err.message ? err.message : err);
+    console.error(
+      `Failed to send email to ${to}:`,
+      err && err.message ? err.message : err
+    );
     throw err;
   }
 }
@@ -98,10 +124,15 @@ export async function sendTemplate(templateKey, to, params = {}, from) {
 
   try {
     const info = await sendMail({ to: toField, subject, text, html, from });
-    console.log(`Template '${template.templateKey || templateKey}' email sent to ${toField}: messageId=${info.messageId || "n/a"}`);
+    console.log(
+      `Template '${template.templateKey || templateKey}' email sent to ${toField}: messageId=${info.messageId || "n/a"}`
+    );
     return info;
   } catch (err) {
-    console.error(`sendTemplate error sending '${template.templateKey || templateKey}' to ${toField}:`, err && err.message ? err.message : err);
+    console.error(
+      `sendTemplate error sending '${template.templateKey || templateKey}' to ${toField}:`,
+      err && err.message ? err.message : err
+    );
     throw err;
   }
 }
