@@ -1,3 +1,5 @@
+// mailer.js (ready for deployment; keeps your public API the same)
+
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 import templates from "./templates.js";
@@ -5,12 +7,10 @@ import dns from "dns";
 
 dotenv.config();
 
-// Prefer IPv4 first to avoid IPv6 timeout issues on some hosts (Render, etc.)
-try {
-  if (typeof dns.setDefaultResultOrder === "function") {
-    dns.setDefaultResultOrder("ipv4first");
-  }
-} catch { /* ignore */ }
+// Prefer IPv4 in cloud environments to avoid IPv6 egress issues
+if (typeof dns.setDefaultResultOrder === "function") {
+  dns.setDefaultResultOrder("ipv4first");
+}
 
 const {
   EMAIL_HOST,
@@ -19,65 +19,81 @@ const {
   EMAIL_PASSWORD,
   EMAIL_FROM,
   NODE_ENV,
-  EMAIL_SECURE, // optional: "true" | "false" to override secure
-  MAIL_DEBUG,   // optional: "true" to enable nodemailer debug logs
+  EMAIL_SECURE,            // NEW: allow explicit secure toggle via env
+  MAIL_VERIFY_ON_BOOT,     // NEW: optionally skip transporter.verify() in prod
 } = process.env;
 
-const isProd = NODE_ENV === "production";
-const isGmail = String(EMAIL_HOST || "").toLowerCase().includes("gmail");
-
-// Default to 587 unless you set EMAIL_PORT; for Gmail in production prefer 465 (set via env)
+// Port & secure resolution
 const port = EMAIL_PORT ? Number(EMAIL_PORT) : 587;
 
-// If EMAIL_SECURE is set, respect it; else infer from port (465 => secure)
-const secure = typeof EMAIL_SECURE === "string"
-  ? EMAIL_SECURE === "true"
-  : port === 465;
+// If EMAIL_SECURE is provided, use it; otherwise infer from port (465 => true)
+const secure =
+  typeof EMAIL_SECURE !== "undefined"
+    ? String(EMAIL_SECURE).toLowerCase() === "true"
+    : port === 465;
 
-// In production, keep TLS strict; in dev, allow self-signed to ease local testing
-const tls = isProd ? {} : { rejectUnauthorized: false };
+// TLS:
+//  - For production, leave TLS object empty (default validation).
+//  - For non-prod, we keep your previous relaxed TLS to ease local testing.
+const tls =
+  NODE_ENV === "production"
+    ? {}
+    : { rejectUnauthorized: false };
 
+// Build transport options with helpful timeouts & STARTTLS requirement when secure=false
+const transportOptions = {
+  host: EMAIL_HOST || "localhost",
+  port,
+  secure, // true => implicit TLS (465), false => STARTTLS (587)
+  auth: {
+    user: EMAIL_USER,
+    pass: EMAIL_PASSWORD,
+  },
+  pool: true,
+  // Robust timeouts (ms)
+  connectionTimeout: 20000, // connect phase
+  greetingTimeout: 20000,   // waiting for the greeting after connection
+  socketTimeout: 30000,     // overall inactivity on the socket
+  // On 587 we require STARTTLS; on 465 (secure=true) this is not used
+  ...(secure ? {} : { requireTLS: true }),
+  tls,
+};
+
+// Sanity warning if required env is missing
 if (!EMAIL_HOST || !EMAIL_PORT || !EMAIL_USER || !EMAIL_PASSWORD) {
   console.warn(
     "Mailer warning: EMAIL_HOST, EMAIL_PORT, EMAIL_USER or EMAIL_PASSWORD is not set. Emails may fail to send."
   );
 }
 
-// Transporter tuned for cloud deployments
-const transporter = nodemailer.createTransport({
-  host: isGmail ? "smtp.gmail.com" : (EMAIL_HOST || "localhost"),
+// Create transporter
+const transporter = nodemailer.createTransport(transportOptions);
+
+// Optional verify (you can disable in prod with MAIL_VERIFY_ON_BOOT=false)
+const shouldVerify =
+  (MAIL_VERIFY_ON_BOOT ?? "true").toLowerCase() === "true";
+
+console.log(
+  "[Mailer] host=%s port=%s secure=%s node_env=%s",
+  EMAIL_HOST,
   port,
-  secure,                 // true for 465, false for 587 (STARTTLS)
-  auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASSWORD,
-  },
-  pool: true,             // connection pooling
-  maxConnections: 3,
-  maxMessages: 50,
-  // Timeouts to avoid long hangs
-  connectionTimeout: 30000,
-  socketTimeout: 30000,
-  greetingTimeout: 20000,
-  // When not using implicit TLS (465), require STARTTLS
-  requireTLS: !secure,
-  tls,
-  // Optional diagnostics
-  logger: MAIL_DEBUG === "true",
-  debug: MAIL_DEBUG === "true",
-});
-
-// Quick visibility (remove if you don’t want secrets echoed)
-console.log(EMAIL_FROM, EMAIL_USER, EMAIL_HOST, EMAIL_PORT, NODE_ENV, secure, tls);
-
-transporter.verify().then(
-  () => {
-    console.log("Mailer: SMTP transporter is ready");
-  },
-  (err) => {
-    console.warn("Mailer: SMTP transporter verification failed:", err && err.message);
-  }
+  secure,
+  NODE_ENV
 );
+
+if (shouldVerify) {
+  transporter.verify().then(
+    () => {
+      console.log("Mailer: SMTP transporter is ready");
+    },
+    (err) => {
+      console.warn(
+        "Mailer: SMTP transporter verification failed:",
+        err && err.message
+      );
+    }
+  );
+}
 
 export async function sendMail({ to, subject, text, html, from } = {}) {
   if (!to) throw new Error("sendMail error: 'to' is required");
@@ -98,7 +114,10 @@ export async function sendMail({ to, subject, text, html, from } = {}) {
     console.log(`Email sent to ${to}: messageId=${info.messageId || "n/a"}`);
     return info;
   } catch (err) {
-    console.error(`Failed to send email to ${to}:`, err && err.message ? err.message : err);
+    console.error(
+      `Failed to send email to ${to}:`,
+      err && err.message ? err.message : err
+    );
     throw err;
   }
 }
@@ -129,10 +148,15 @@ export async function sendTemplate(templateKey, to, params = {}, from) {
 
   try {
     const info = await sendMail({ to: toField, subject, text, html, from });
-    console.log(`Template '${template.templateKey || templateKey}' email sent to ${toField}: messageId=${info.messageId || "n/a"}`);
+    console.log(
+      `Template '${template.templateKey || templateKey}' email sent to ${toField}: messageId=${info.messageId || "n/a"}`
+    );
     return info;
   } catch (err) {
-    console.error(`sendTemplate error sending '${template.templateKey || templateKey}' to ${toField}:`, err && err.message ? err.message : err);
+    console.error(
+      `sendTemplate error sending '${template.templateKey || templateKey}' to ${toField}:`,
+      err && err.message ? err.message : err
+    );
     throw err;
   }
 }
