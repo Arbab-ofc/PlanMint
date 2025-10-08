@@ -49,7 +49,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions)); 
-app.use(morgan('dev')); 
+app.use(morgan('production')); 
 app.use(compression()); 
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: true })); 
