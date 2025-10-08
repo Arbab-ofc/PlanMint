@@ -41,28 +41,7 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 30000,
 });
 
-const shouldVerify =
-  (MAIL_VERIFY_ON_BOOT ?? "true").toLowerCase() === "true";
 
-console.log(
-  "[Mailer] service=gmail user=%s node_env=%s verifyOnBoot=%s",
-  EMAIL_USER,
-  NODE_ENV,
-  shouldVerify
-);
-
-if (shouldVerify) {
-  transporter.verify().then(
-    () => {
-      console.log("Mailer: SMTP transporter is ready");
-      console.log(shouldVerify)
-    },
-    (err) => {
-      console.log(shouldVerify)
-      console.warn("Mailer: SMTP transporter verification failed:", err && err.message);
-    }
-  );
-}
 
 export async function sendMail({ to, subject, text, html, from } = {}) {
   if (!to) throw new Error("sendMail error: 'to' is required");
